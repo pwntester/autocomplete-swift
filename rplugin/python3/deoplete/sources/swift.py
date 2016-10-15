@@ -47,11 +47,14 @@ class Completer(object):
         text = self.__vim.current.buffer[:]
         path, offset = self.__prepare_completion(text, line, column)
 
-        completer = self.__decide_completer()
-        candidates_json = completer.complete(path, offset)
+        completer = self.__generate_completer()
+        if completer is None:
+            return []
+
+        completion_result = completer.complete(path, offset)
         os.remove(path)
 
-        return [self.__convert_candidates(c) for c in candidates_json]
+        return [self.__convert_candidates(c) for c in completion_result['candidates']]
 
     def decide_completion_position(self, text, column):
         result = self.__completion_pattern.search(text)
@@ -61,13 +64,13 @@ class Completer(object):
 
         return result.start()
 
-    def __decide_completer(self):
-        port = int(self.__vim.call('sourcekitten_daemon#port'))
+    def __generate_completer(self):
+        port = int(self.__vim.call('yata#port'))
 
         if port <= 0:
-            return SourceKitten()
+            return None
 
-        return SourceKittenDaemon(port)
+        return Yata(port)
 
     def __prepare_completion(self, text, line, column):
         import tempfile
@@ -120,49 +123,35 @@ class Completer(object):
         return self.__placeholder_pattern.sub(replacer, text)
 
 
-class SourceKitten(object):
-    def __init__(self, command='sourcekitten'):
-        self.__command = command
-
-    def complete(self, path, offset):
-        import subprocess
-        import json
-
-        if not self.is_executable:
-            return []
-
-        try:
-            request = [
-                self.__command,
-                'complete',
-                '--file', path,
-                '--offset', str(offset)
-            ]
-            return json.loads(subprocess.check_output(request).decode())
-
-        except subprocess.CalledProcessError:
-            return []
-
-    @property
-    def is_executable(self):
-        import shutil
-
-        return shutil.which(self.__command) is not None
-
-
-class SourceKittenDaemon(object):
-    def __init__(self, port=8081):
-        self.__endpoint = 'http://localhost:{}/complete'.format(port)
+class Yata(object):
+    def __init__(self, port):
+        self.__endpoint = 'http://localhost:{}/'.format(port)
 
     def complete(self, path, offset):
         import json
         from urllib import request
 
+        request_body = json.dumps(
+            {
+                'method': 'complete',
+                'parameters': {
+                    'file': {
+                        'path': path
+                    },
+                    'offset': offset
+                }
+            }
+        ).encode('utf-8')
+
         response = request.urlopen(
             request.Request(
                 self.__endpoint,
-                method='GET',
-                headers={'X-Offset': offset, 'X-Path': path}
+                data=request_body,
+                method='POST',
+                headers={
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                }
             )
         )
 

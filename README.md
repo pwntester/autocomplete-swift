@@ -16,14 +16,15 @@ Please use this plugin in NeoVim with deoplete.nvim.
 
 ## Installation
 
-Autocomplete-swift uses [SourceKitten][github-sourcekitten] as its back-end.
+Autocomplete-swift uses [Yata][github-yata] as its back-end.
 Therefore this plugin supports macOS only.
-SourceKitten can be installed with [Homebrew][github-homebrew].
+Yata can be installed with [Homebrew][github-homebrew].
 
 Please execute the following command:
 
 ```bash
-$ brew install sourcekitten
+$ brew tap mitsuse/yata
+$ brew install yata
 ```
 
 To install autocomplete-swift,
@@ -48,6 +49,18 @@ you should enable [key-mappings of neosnippets][github-neosnippet-config] instea
 Autocomplete-swift gets along with neosnippet by converting placeholders into its ones.
 
 
+## Usage
+
+First, run Yata server in your shell:
+
+```text
+$ yata run --port 9000 # Choose a port number.
+```
+
+After that, execute `:call yata#enable(9000)` in NeoVim.
+Pass the same port number as one used by Yata to this function.
+
+
 ## Features
 
 ### Completion
@@ -66,29 +79,6 @@ Autocomplete-swift supports types of completion as follow:
 
 This plugin supports jumping to placeholders in arguments of method.
 Please read [Installation](#installation).
-
-
-### Xcode Project Support
-
-Autocomplete-swift experimentally supports completion with framework/SDK
-by communicating with [SourceKittenDaemon][github-sourcekittendaemon].
-
-After launching SourceKittenDaemon,
-execute `call sourcekitten_daemon#enable({port_number})` in NeoVim.
-
-
-#### Xcode <= 7.3.1
-
-Please use the original [SourceKittenDaemon][github-sourcekittendaemon].
-
-
-#### Xcode 8.0+
-
-You can use [the forked version of SourceKittenDaemon][github-mitsuse/sourcekittendaemon] for Xcode 8.0 as a **workaround**.
-Please checkout `support-xcode8.0` branch.
-
-It can switch toolchains with `TOOLCHAINS` variable.
-For excample, set `com.apple.dt.toolchain.Swift_2_3` to the variable for Swift 2.3.
 
 
 ## TODO
@@ -113,9 +103,7 @@ Please read [LICENSE][license].
 [license]: LICENSE
 [release-badge]: https://img.shields.io/github/tag/mitsuse/neocomplete-swift.svg?style=flat-square
 [release]: https://github.com/mitsuse/neocomplete-swift/releases
-[github-sourcekitten]: https://github.com/jpsim/SourceKitten
-[github-sourcekittendaemon]: https://github.com/terhechte/SourceKittenDaemon
-[github-mitsuse/sourcekittendaemon]: https://github.com/mitsuse/SourceKittenDaemon/tree/support-xcode8.0
+[github-yata]: https://github.com/mitsuse/yata
 [github-homebrew]: https://github.com/Homebrew/homebrew-core
 [github-neosnippet]: https://github.com/Shougo/neosnippet.vim
 [github-neosnippet-config]: https://github.com/Shougo/neosnippet.vim#configuration
