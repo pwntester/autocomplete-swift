@@ -51,14 +51,18 @@ Autocomplete-swift gets along with neosnippet by converting placeholders into it
 
 ## Usage
 
-First, run Yata server in your shell:
+Yata server,
+which is a completion server used in autocomplete-swift,
+runs with `9000` port automatically.
 
-```text
-$ yata run --port 9000 # Choose a port number.
+You can set the path of `yata` command and the port number used by Yata server in `init.vim`:
+
+```vim
+let g:yata#config = {
+\ 'command': $HOME . '/bin/yata',
+\ 'port': 10000
+\ }
 ```
-
-After that, execute `:call yata#enable(9000)` in NeoVim.
-Pass the same port number as one used by Yata to this function.
 
 
 ## Features

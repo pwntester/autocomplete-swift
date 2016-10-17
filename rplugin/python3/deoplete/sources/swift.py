@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import yata
+
 from .base import Base
 
 
@@ -34,11 +36,13 @@ class Completer(object):
     def __init__(self, vim):
         import re
 
+        _, port = yata.config(vim)
         self.__vim = vim
         self.__completion_pattern = re.compile('\w*$')
         self.__placeholder_pattern = re.compile(
             '<#(?:T##)?(?:[^#]+##)?(?P<desc>[^#]+)#>'
         )
+        self.__port = port
 
     def complete(self, line, column):
         import os
@@ -47,7 +51,7 @@ class Completer(object):
         text = self.__vim.current.buffer[:]
         path, offset = self.__prepare_completion(text, line, column)
 
-        completer = self.__generate_completer()
+        completer = yata.Client(self.__port)
         if completer is None:
             return []
 
@@ -63,14 +67,6 @@ class Completer(object):
             return column - 1
 
         return result.start()
-
-    def __generate_completer(self):
-        port = int(self.__vim.call('yata#port'))
-
-        if port <= 0:
-            return None
-
-        return Yata(port)
 
     def __prepare_completion(self, text, line, column):
         import tempfile
@@ -121,41 +117,3 @@ class Completer(object):
                 return ''
 
         return self.__placeholder_pattern.sub(replacer, text)
-
-
-class Yata(object):
-    def __init__(self, port):
-        self.__endpoint = 'http://localhost:{}/'.format(port)
-
-    def complete(self, path, offset):
-        import json
-        from urllib import request
-
-        request_body = json.dumps(
-            {
-                'method': 'complete',
-                'parameters': {
-                    'file': {
-                        'path': path
-                    },
-                    'offset': offset
-                }
-            }
-        ).encode('utf-8')
-
-        response = request.urlopen(
-            request.Request(
-                self.__endpoint,
-                data=request_body,
-                method='POST',
-                headers={
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                }
-            )
-        )
-
-        if response.status != 200:
-            return []
-
-        return json.loads(response.read().decode())
