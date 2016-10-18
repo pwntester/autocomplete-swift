@@ -125,7 +125,7 @@ class Client(object):
 
 
 def config(vim):
-    config = vim.vars['yata#config']
+    config = vim.vars.get('yata#config', {})
     command = validate_command(config.get('command', 'yata'))
     port = int(config.get('port', 9000))
     return (command, port)
