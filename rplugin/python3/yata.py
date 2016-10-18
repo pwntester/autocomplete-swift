@@ -24,14 +24,18 @@ class YataVim(object):
             return self.__exception.to_json()
 
         response = Client(self.__port).ping()
-        if not response is None and response.get('name') != 'jp.mitsuse.Yata':
-            return
+        if not response is None:
+            server_name = response.get('name')
+            if server_name != 'jp.mitsuse.Yata':
+                return UnknownServerRunnning(self.__port, server_name).to_json()
 
         execute([
             self.__command,
             'run',
             '--port', str(self.__port)
         ])
+
+        return {}
 
 
 class Client(object):
@@ -144,6 +148,35 @@ class CommandNotFound(Exception):
                 'message': 'command not found: {}'.format(self.command),
                 'paramerters': {
                     'command': self.command
+                }
+            }
+        }
+
+
+class UnknownServerRunnning(Exception):
+    def __init__(self, port, name):
+        self.__port = port
+        self.__name = name
+
+    @property
+    def port(self):
+        return self.__port
+
+    @property
+    def name(self):
+        return self.__name
+
+    def to_json(self):
+        return {
+            'error': {
+                'name': 'unknown_server_running',
+                'message': 'unknown server is running: port={}, name={}'.format(
+                    self.port,
+                    self.name
+                ),
+                'paramerters': {
+                    'port': self.port,
+                    'name': self.name
                 }
             }
         }
