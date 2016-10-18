@@ -29,11 +29,15 @@ class YataVim(object):
             if server_name != 'jp.mitsuse.Yata':
                 return UnknownServerRunnning(self.__port, server_name).to_json()
 
-        execute([
+        command = [
             self.__command,
             'run',
             '--port', str(self.__port)
-        ])
+        ]
+        try:
+            execute(command)
+        except:
+            return CommandExecutionFailed(command).to_json()
 
         return {}
 
@@ -146,6 +150,28 @@ class CommandNotFound(Exception):
             'error': {
                 'name': 'command_not_found',
                 'message': 'command not found: {}'.format(self.command),
+                'paramerters': {
+                    'command': self.command
+                }
+            }
+        }
+
+
+class CommandExecutionFailed(Exception):
+    def __init__(self, command):
+        self.__command = command
+
+    @property
+    def command(self):
+        return self.__command
+
+    def to_json(self):
+        return {
+            'error': {
+                'name': 'command_execution_failed',
+                'message': 'command execution failed: {}'.format(
+                    ' '.join(self.command),
+                ),
                 'paramerters': {
                     'command': self.command
                 }
