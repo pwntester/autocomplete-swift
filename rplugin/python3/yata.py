@@ -45,7 +45,6 @@ class YataVim(object):
         return {}
 
 
-
 class Client(object):
     def __init__(self, port):
         self.__port = port
