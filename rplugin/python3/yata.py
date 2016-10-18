@@ -9,7 +9,7 @@ import subprocess
 
 
 @neovim.plugin
-class YataVim(object):
+class Service(object):
     def __init__(self, vim):
         try:
             command, port = config(vim)
