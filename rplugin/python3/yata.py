@@ -3,6 +3,7 @@
 
 import neovim
 import os
+import json
 import shutil
 import subprocess
 
@@ -23,31 +24,34 @@ class YataVim(object):
         if not self.__exception is None:
             return self.__exception.to_json()
 
-        response = Client(self.__port).ping()
-        if not response is None:
-            server_name = response.get('name')
-            if server_name != 'jp.mitsuse.Yata':
-                return UnknownServerRunnning(self.__port, server_name).to_json()
-
-        command = [
-            self.__command,
-            'run',
-            '--port', str(self.__port)
-        ]
         try:
-            execute(command)
-        except:
-            return CommandExecutionFailed(command).to_json()
+            response = Client(self.__port).ping()
+        except RequestFailed:
+            command = [
+                self.__command,
+                'run',
+                '--port', str(self.__port)
+            ]
+            try:
+                execute(command)
+            except:
+                return CommandExecutionFailed(command).to_json()
+            return {}
+
+        server_name = response.get('name')
+        if server_name != 'jp.mitsuse.Yata':
+            return UnknownServerRunnning(self.__port, server_name).to_json()
 
         return {}
 
 
+
 class Client(object):
     def __init__(self, port):
+        self.__port = port
         self.__endpoint = 'http://localhost:{}/'.format(port)
 
     def complete(self, path, offset):
-        import json
         from urllib import request
 
         request_body = json.dumps(
@@ -62,25 +66,31 @@ class Client(object):
             }
         ).encode('utf-8')
 
-        response = request.urlopen(
-            request.Request(
-                self.__endpoint,
-                data=request_body,
-                method='POST',
-                headers={
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                }
+        try:
+            response = request.urlopen(
+                request.Request(
+                    self.__endpoint,
+                    data=request_body,
+                    method='POST',
+                    headers={
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    }
+                )
             )
-        )
+        except Exception as exception:
+            raise RequestFailed(self.__port, request_body, exception)
 
         if response.status != 200:
-            return []
+            raise RequestFailed(
+                self.__port,
+                request_body,
+                UnacceptableStatus(response.status)
+            )
 
         return json.loads(response.read().decode())
 
     def ping(self):
-        import json
         from urllib import request
 
         request_body = json.dumps(
@@ -102,11 +112,17 @@ class Client(object):
                     }
                 )
             )
-            if response.status != 200:
-                return None
-            return json.loads(response.read().decode())
-        except:
-            return None
+        except Exception as exception:
+            raise RequestFailed(self.__port, request_body, exception)
+
+        if response.status != 200:
+            raise RequestFailed(
+                self.__port,
+                request_body,
+                UnacceptableStatus(response.status)
+            )
+
+        return json.loads(response.read().decode())
 
 
 def config(vim):
@@ -170,13 +186,52 @@ class CommandExecutionFailed(Exception):
             'error': {
                 'name': 'command_execution_failed',
                 'message': 'command execution failed: {}'.format(
-                    ' '.join(self.command),
+                    ' '.join(self.command)
                 ),
                 'paramerters': {
                     'command': self.command
                 }
             }
         }
+
+
+class RequestFailed(Exception):
+    def __init__(self, port, request, exception):
+        self.__port = port
+        self.__request = request
+        self.__exception = exception
+
+    @property
+    def port(self):
+        return self.__port
+
+    @property
+    def request(self):
+        return self.__request
+
+    @property
+    def exception(self):
+        return self.__exception
+
+    def to_json(self):
+        return {
+            'error': {
+                'name': 'request_failed',
+                'message': 'request failed: {}'.format(
+                    self.port,
+                    self.request,
+                    self.exception
+                ),
+                'paramerters': {
+                    'command': self.command
+                }
+            }
+        }
+
+
+class UnacceptableStatus(Exception):
+    def __init__(self, status):
+        self.__status = status
 
 
 class UnknownServerRunnning(Exception):
