@@ -10,12 +10,19 @@ import subprocess
 @neovim.plugin
 class YataVim(object):
     def __init__(self, vim):
-        command, port = config(vim)
-        self.__command = command
-        self.__port = port
+        try:
+            command, port = config(vim)
+            self.__command = command
+            self.__port = port
+            self.__exception = None
+        except CommandNotFound as exception:
+            self.__exception = exception
 
     @neovim.function('_yata__run_if_needed', sync=True)
     def run_if_needed(self, args):
+        if not self.__exception is None:
+            return self.__exception.to_json()
+
         response = Client(self.__port).ping()
         if not response is None and response.get('name') != 'jp.mitsuse.Yata':
             return
@@ -117,7 +124,7 @@ def validate_command(path):
 
     default = shutil.which(os.path.basename(path), mode=os.X_OK)
     if default is None:
-        raise CommandNotFound(default)
+        raise CommandNotFound(path)
 
     return default
 
@@ -129,3 +136,14 @@ class CommandNotFound(Exception):
     @property
     def command(self):
         return self.__command
+
+    def to_json(self):
+        return {
+            'error': {
+                'name': 'command_not_found',
+                'message': 'command not found: {}'.format(self.command),
+                'paramerters': {
+                    'command': self.command
+                }
+            }
+        }
