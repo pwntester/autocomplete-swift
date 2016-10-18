@@ -45,6 +45,28 @@ class Service(object):
 
         return {}
 
+    @neovim.function('_yata__restart', sync=True)
+    def restart(self, args):
+        if not self.__exception is None:
+            return self.__exception.to_json()
+
+        try:
+            response = Client(self.__config.port).ping()
+        except RequestFailed:
+            return self.run_if_needed([])
+
+        server_name = response.get('name')
+        server_pid = response.get('pid')
+        if server_name != 'jp.mitsuse.Yata' or server_pid is None:
+            return UnknownServerRunnning(self.__config.port, server_name).to_json()
+
+        command = ['kill', '--TERM', str(server_pid)]
+        try:
+            execute(command, variables=None).communicate()
+        except:
+            return CommandExecutionFailed(command).to_json()
+        return self.run_if_needed([])
+
     @staticmethod
     def load_config():
         try:
@@ -194,7 +216,7 @@ class Client(object):
 
 
 def execute(command, variables):
-    subprocess.Popen(
+    return subprocess.Popen(
         command,
         stdin=None,
         stdout=None,
