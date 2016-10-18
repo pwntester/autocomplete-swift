@@ -14,24 +14,17 @@ class YataVim(object):
         self.__command = command
         self.__port = port
 
-    def is_running(self):
+    @neovim.function('_yata__run_if_needed', sync=True)
+    def run_if_needed(self, args):
         response = Client(self.__port).ping()
-        if response is None:
-            return False
-        return response.get('name') == 'jp.mitsuse.Yata'
+        if not response is None and response.get('name') != 'jp.mitsuse.Yata':
+            return
 
-    def run(self):
         execute([
             self.__command,
             'run',
             '--port', str(self.__port)
         ])
-
-    @neovim.function('_yata__run_if_needed', sync=True)
-    def run_if_needed(self, args):
-        if self.is_running():
-            return
-        self.run()
 
 
 class Client(object):
