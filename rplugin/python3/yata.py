@@ -12,11 +12,9 @@ import subprocess
 class Service(object):
     def __init__(self, vim):
         try:
-            command, port = config(vim)
-            self.__command = command
-            self.__port = port
+            self.__config = Service.load_config()
             self.__exception = None
-        except CommandNotFound as exception:
+        except Exception as exception:
             self.__exception = exception
 
     @neovim.function('_yata__run_if_needed', sync=True)
@@ -24,25 +22,96 @@ class Service(object):
         if not self.__exception is None:
             return self.__exception.to_json()
 
+        variables = os.environ.copy()
+        variables['TOOLCHAINS'] = self.__config.toolchains
+
         try:
-            response = Client(self.__port).ping()
+            response = Client(self.__config.port).ping()
         except RequestFailed:
             command = [
-                self.__command,
+                self.__config.command,
                 'run',
-                '--port', str(self.__port)
+                '--port', str(self.__config.port)
             ]
             try:
-                execute(command)
+                execute(command, variables)
             except:
                 return CommandExecutionFailed(command).to_json()
             return {}
 
         server_name = response.get('name')
         if server_name != 'jp.mitsuse.Yata':
-            return UnknownServerRunnning(self.__port, server_name).to_json()
+            return UnknownServerRunnning(self.__config.port, server_name).to_json()
 
         return {}
+
+    @staticmethod
+    def load_config():
+        try:
+            path_config = os.path.expandvars('$HOME/.yata/config.json')
+            with open(path_config) as f:
+                json_config = json.load(f)
+        except Exception as exception:
+            raise ConfigLoadingFailed(path_config, exception)
+        return Config(json_config)
+
+
+class Config(object):
+    def __init__(self, dictionary):
+        try:
+            self.__port = dictionary.get('port', 9000)
+            self.__command = os.path.expandvars(dictionary.get('command', 'yata'))
+            self.__toolchains = dictionary.get(
+                "toolchains",
+                "com.apple.dt.toolchain.Swift_2_3"
+            )
+            self.__environments = list(
+                map(lambda o: Environment(o), dictionary.get('environments', []))
+            )
+        except Exception as exception:
+            raise InvalidConfig()
+        if not (
+            type(self.__port) is int and
+            type(self.__command) is str and
+            type(self.__toolchains) is str and
+            type(self.__environments) is list
+        ):
+            raise InvalidConfig()
+
+    @property
+    def port(self):
+        return self.__port
+
+    @property
+    def toolchains(self):
+        return self.__toolchains
+
+    @property
+    def command(self):
+        return self.__command
+
+    @property
+    def environments(self):
+        return self.__environments
+
+
+class Environment(object):
+    def __init__(self, dictionary):
+        try:
+            self.__name = dictionary['name']
+            self.__toolchains = dictionary['toolchains']
+        except Exception as exception:
+            raise InvalidConfig()
+        if not (type(self.__name) is str and type(self.__toolchains) is str):
+            raise InvalidConfig()
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def toolchains(self):
+        return self.__toolchains
 
 
 class Client(object):
@@ -124,49 +193,54 @@ class Client(object):
         return json.loads(response.read().decode())
 
 
-def config(vim):
-    config = vim.vars.get('yata#config', {})
-    command = validate_command(config.get('command', 'yata'))
-    port = int(config.get('port', 9000))
-    return (command, port)
-
-
-def execute(command):
+def execute(command, variables):
     subprocess.Popen(
         command,
         stdin=None,
         stdout=None,
         stderr=None,
-        start_new_session=True
+        start_new_session=True,
+        env=variables
     )
 
 
-def validate_command(path):
-    if os.access(path, mode=os.X_OK):
-        return path
-
-    default = shutil.which(os.path.basename(path), mode=os.X_OK)
-    if default is None:
-        raise CommandNotFound(path)
-
-    return default
-
-
-class CommandNotFound(Exception):
-    def __init__(self, command):
-        self.__command = command
-
-    @property
-    def command(self):
-        return self.__command
+class InvalidConfig(Exception):
+    def __init__(self):
+        pass
 
     def to_json(self):
         return {
             'error': {
-                'name': 'command_not_found',
-                'message': 'command not found: {}'.format(self.command),
+                'name': 'invalid_config',
+                'message': 'invalid configuration'
+            }
+        }
+
+
+class ConfigLoadingFailed(Exception):
+    def __init__(self, path, exception):
+        self.__path = path
+        self.__exception = exception
+
+    @property
+    def path(self):
+        return self.__path
+
+    @property
+    def exception(self):
+        return self.__exception
+
+    def to_json(self):
+        return {
+            'error': {
+                'name': 'config_loading_failed',
+                'message': 'failed loading configuration: path={}, exception={}'.format(
+                    self.path,
+                    self.exception
+                ),
                 'paramerters': {
-                    'command': self.command
+                    'path': self.path,
+                    'exception': str(self.exception),
                 }
             }
         }
@@ -216,13 +290,15 @@ class RequestFailed(Exception):
         return {
             'error': {
                 'name': 'request_failed',
-                'message': 'request failed: {}'.format(
+                'message': 'request failed: port={}, request={}, exception={}'.format(
                     self.port,
                     self.request,
                     self.exception
                 ),
                 'paramerters': {
-                    'command': self.command
+                    'port': self.port,
+                    'request': str(self.request),
+                    'exception': str(self.exception)
                 }
             }
         }

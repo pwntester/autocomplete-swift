@@ -36,13 +36,13 @@ class Completer(object):
     def __init__(self, vim):
         import re
 
-        _, port = yata.config(vim)
+        config = yata.Service.load_config()
         self.__vim = vim
         self.__completion_pattern = re.compile('\w*$')
         self.__placeholder_pattern = re.compile(
             '<#(?:T##)?(?:[^#]+##)?(?P<desc>[^#]+)#>'
         )
-        self.__port = port
+        self.__port = config.port
 
     def complete(self, line, column):
         import os
